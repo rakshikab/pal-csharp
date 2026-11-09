@@ -6179,10 +6179,11 @@ between two distinct arrays of one element type is `Pulse.Lib.CSharp.Array.copy`
 from `memcpy`: the caller shows `0 <= len <= length` of both, and `dst`'s contents become
 `Seq.append (Seq.slice s 0 len) (Seq.slice d len (length d))`.
 
-### R22.21 Assigning a property
+### R22.21 Assigning a property or indexer
 
-`P = v` (or `o.P = v`), for a property with a translated setter, is the call `set_P(v)`,
-and a method that does it mutates its receiver.
+`P = v` (or `o.P = v`), for a property with a translated setter, calls `set_P(v)`. A
+one-argument class indexer write `o[i] = v`, when its setter is translated, calls
+`set_Item(i, v)`. A method that does either mutates its receiver.
 
 ### R22.22 `has_default` propagates
 
@@ -7954,8 +7955,9 @@ statement, as a `void` `[RegionOp]` is (R27.22).
 
 **Class indexers.** A read-only indexer whose `get` is an accessor, with its contract on
 the accessor (R22.13), is collected as `get_Item`. A read `list[i]` in code is a call of it,
-as a computed property read is (R9.20a). An indexer with a setter, or an expression-bodied
-one, is still PALCS0591.
+as a computed property read is (R9.20a). In full-translation mode, an indexer with a setter
+or an expression-bodied indexer is still PALCS0591; this accounting restriction is separate
+from R22.21's lowering of writes when the setter is translated.
 
 **`ThrowIfNull` of a delegate.** A non-nullable delegate parameter is non-null (R10), so
 `ArgumentNullException.ThrowIfNull(match)` is nothing, as it is for arrays and objects.

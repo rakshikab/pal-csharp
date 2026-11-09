@@ -1467,6 +1467,27 @@ public sealed partial class ExprLowerer(SemanticModel model, WellKnown known, Di
     public IrCall? ComputedWrite(AssignmentExpressionSyntax node, IrLoc loc)
     {
         if (SpecPosition || !node.IsKind(SyntaxKind.SimpleAssignmentExpression)) return null;
+        if (node.Left is ElementAccessExpressionSyntax { ArgumentList.Arguments: [var key] } ea &&
+            model.GetSymbolInfo(ea).Symbol is IPropertySymbol { IsIndexer: true, SetMethod: { } indexSetter } indexer)
+        {
+            if (Declarations.Has(indexer, known.SpecAttribute) || Declarations.Has(indexer, known.ModelAttribute)) return null;
+            if (Declarations.KindOf(indexSetter, known) is null) return null;
+            IrExpr target = ea.Expression is ThisExpressionSyntax
+                ? new IrVar(loc, Names.This) { Type = Enclosing(node) }
+                : Lower(ea.Expression);
+            return new IrCall(loc, Naming.Of(indexSetter),
+                [target,
+                 ToDeclared(Lower(key.Expression), known.MapType(indexSetter.Parameters[0].Type)),
+                 ToDeclared(Lower(node.Right), known.MapType(indexSetter.Parameters[1].Type))])
+            {
+                Kind = CalleeKind.Method,
+                ResultType = known.MapType(indexSetter.ReturnType),
+                HasReceiver = true,
+                ParamTypes = Declarations.ParamTypes(indexSetter, known, true),
+                TypeArguments = known.TypeArguments(indexSetter),
+                MutatesReceiver = !Declarations.IsReadOnly(indexSetter, model.Compilation, known),
+            };
+        }
         if (model.GetSymbolInfo(node.Left).Symbol is not IPropertySymbol { IsIndexer: false } prop) return null;
         if (prop.SetMethod is not { } setter) return null;
         // An auto-property's setter has no body to translate: R3.4 reads the property as
